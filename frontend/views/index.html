@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+<body>
+<div class="row justify-content-md-center">
+    <div class="col-8" style="padding-top: 20px">
+        <h6>Click Go live" to check current CPU usage </h6>
+    </div>
+</div>
+<div class="row justify-content-md-center">
+    <div class="col-8">
+
+        <div id="selectSymbol">
+            <form id="idForm">
+                <button name="submit">Go live</button>
+            </form>
+        </div>
+        <div id="display"></div>
+    </div>
+</div>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+
+<script>
+    google.charts.load('current', {packages: ['corechart', 'line']});
+    google.setOnLoadCallback(Initialize);
+
+    var options = {
+        hAxis: {
+            title: 'Time',
+            format: 'HH:mm:ss'
+        },
+        vAxis: {
+            title: '% CPU Usage',
+            minValue: 0
+        },
+        colors: ['#a52714'],
+        crosshair: {
+            color: '#000',
+            trigger: 'selection'
+        },
+        dateFormat:'HH:mm:ss'
+    };
+
+    function Initialize(){
+        data = new google.visualization.DataTable();
+        data.addColumn('datetime', 'Time');
+        data.addColumn('number', '% CPU usage');
+        return data;
+    }
+
+    function streamLiveCpuUsage(){
+
+        if ("WebSocket" in window) {
+            console.log("WebSocket is supported by your Browser!");
+
+            // Let us open a web socket
+            var url = "localhost:8081";
+            console.log(url);
+            var ws = new WebSocket("ws://"+url+"/stream");
+
+            ws.onmessage = function(event) {
+                console.log(`[message] Data received from server: ${event.data}`);
+
+                curTime = new Date();
+                var curCount = JSON.parse(`${event.data}`);
+                yVal = parseInt(curCount.cpuPercentageUsage,10)
+                data.addRows([[curTime,yVal]]);
+
+                var chart = new google.visualization.LineChart(document.getElementById('display'));
+                chart.draw(data, options);
+            };
+
+            ws.onclose = function(event) {
+                if (event.wasClean) {
+                    console.log(`[close] Connection closed cleanly, code=${event.code} reason=${event.reason}`);
+                } else {
+                    // e.g. server process killed or network down
+                    // event.code is usually 1006 in this case
+                    console.log('[close] Connection died');
+                }
+            };
+
+            ws.onerror = function(error) {
+                console.log(`[error] ${error.message}`);
+            };
+
+        } else {
+
+            // The browser doesn't support WebSocket
+            console.log("WebSocket NOT supported by your Browser!");
+        }
+    }
+
+    $("#idForm").submit(function(e) {
+        e.preventDefault(); // avoid to execute the actual submit of the form.
+        streamLiveCpuUsage();
+    });
+</script>
